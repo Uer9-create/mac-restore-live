@@ -27,7 +27,7 @@ apt-get install -y \
   wget curl usbutils pciutils \
   zenity
 
-echo "[chroot] Cloning and building libplist..."
+echo "[chroot] Building libplist..."
 cd /tmp
 git clone --depth=1 https://github.com/libimobiledevice/libplist.git
 cd libplist && ./autogen.sh --prefix=/usr/local --without-cython
@@ -46,19 +46,19 @@ cd libusbmuxd && ./autogen.sh --prefix=/usr/local
 make -j$(nproc) && make install && ldconfig
 cd /tmp && rm -rf libusbmuxd
 
+echo "[chroot] Building libtatsu..."
+git clone --depth=1 https://github.com/libimobiledevice/libtatsu.git
+cd libtatsu && ./autogen.sh --prefix=/usr/local
+make -j$(nproc) && make install && ldconfig
+echo "[chroot] Verifying libtatsu..."
+pkg-config --modversion libtatsu-1.0 && echo "libtatsu OK" || { echo "ERROR: libtatsu pkg-config failed"; ls /usr/local/lib/pkgconfig/; exit 1; }
+cd /tmp && rm -rf libtatsu
+
 echo "[chroot] Building libimobiledevice..."
 git clone --depth=1 https://github.com/libimobiledevice/libimobiledevice.git
 cd libimobiledevice && ./autogen.sh --prefix=/usr/local --without-cython
 make -j$(nproc) && make install && ldconfig
 cd /tmp && rm -rf libimobiledevice
-
-echo "[chroot] Building libtatsu..."
-git clone --depth=1 https://github.com/libimobiledevice/libtatsu.git
-cd libtatsu && ./autogen.sh --prefix=/usr/local
-make -j$(nproc) && make install && ldconfig
-echo "[chroot] Verifying libtatsu pkg-config..."
-pkg-config --modversion libtatsu-1.0 || { echo "ERROR: libtatsu pkg-config not found!"; pkg-config --list-all | grep tatsu || true; ls /usr/local/lib/pkgconfig/ || true; exit 1; }
-cd /tmp && rm -rf libtatsu
 
 echo "[chroot] Building idevicerestore..."
 git clone --depth=1 https://github.com/libimobiledevice/idevicerestore.git
