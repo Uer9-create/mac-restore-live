@@ -36,7 +36,12 @@ download_iso() {
 }
 
 prepare_dirs() {
-  info "Preparing work directories..."
+  info "Preparing work directories (unmounting any leftovers)..."
+  umount -lf "$SQUASH_DIR/sys"     2>/dev/null || true
+  umount -lf "$SQUASH_DIR/proc"    2>/dev/null || true
+  umount -lf "$SQUASH_DIR/dev/pts" 2>/dev/null || true
+  umount -lf "$SQUASH_DIR/dev"     2>/dev/null || true
+  umount -lf "$MOUNT_DIR"          2>/dev/null || true
   rm -rf "$WORK_DIR"
   mkdir -p "$MOUNT_DIR" "$EXTRACT_DIR" "$SQUASH_DIR"
 }
@@ -71,26 +76,27 @@ install_software() {
 
 overlay_files() {
   info "Copying overlay files..."
-  cp overlay/usr/local/bin/mac-restore    "$SQUASH_DIR/usr/local/bin/mac-restore"
+  cp overlay/usr/local/bin/mac-restore     "$SQUASH_DIR/usr/local/bin/mac-restore"
   cp overlay/usr/local/bin/ipsw-downloader "$SQUASH_DIR/usr/local/bin/ipsw-downloader"
   chmod +x "$SQUASH_DIR/usr/local/bin/mac-restore"
   chmod +x "$SQUASH_DIR/usr/local/bin/ipsw-downloader"
   mkdir -p "$SQUASH_DIR/home/ubuntu/Desktop"
-  cp overlay/home/ubuntu/Desktop/Mac-Restore.desktop "$SQUASH_DIR/home/ubuntu/Desktop/"
+  cp overlay/home/ubuntu/Desktop/Mac-Restore.desktop     "$SQUASH_DIR/home/ubuntu/Desktop/"
   cp overlay/home/ubuntu/Desktop/IPSW-Downloader.desktop "$SQUASH_DIR/home/ubuntu/Desktop/"
   chmod +x "$SQUASH_DIR/home/ubuntu/Desktop/"*.desktop
 }
 
 teardown_chroot() {
   info "Unmounting chroot..."
-  umount "$SQUASH_DIR/sys"    2>/dev/null || true
-  umount "$SQUASH_DIR/proc"   2>/dev/null || true
-  umount "$SQUASH_DIR/dev/pts" 2>/dev/null || true
-  umount "$SQUASH_DIR/dev"    2>/dev/null || true
+  umount -lf "$SQUASH_DIR/sys"     2>/dev/null || true
+  umount -lf "$SQUASH_DIR/proc"    2>/dev/null || true
+  umount -lf "$SQUASH_DIR/dev/pts" 2>/dev/null || true
+  umount -lf "$SQUASH_DIR/dev"     2>/dev/null || true
 }
 
 rebuild_squashfs() {
   info "Rebuilding squashfs (this takes several minutes)..."
+  rm -f "$EXTRACT_DIR/casper/filesystem.squashfs"
   mksquashfs "$SQUASH_DIR" "$EXTRACT_DIR/casper/filesystem.squashfs" \
     -comp xz -b 1M -no-progress -noappend
   printf '%s' "$(du -sx --block-size=1 "$SQUASH_DIR" | cut -f1)" \
@@ -120,9 +126,8 @@ build_iso() {
 }
 
 cleanup() {
-  info "Cleaning up..."
-  umount "$MOUNT_DIR" 2>/dev/null || true
   teardown_chroot
+  umount -lf "$MOUNT_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -138,7 +143,7 @@ main() {
   overlay_files
   teardown_chroot
   rebuild_squashfs
-  umount "$MOUNT_DIR" 2>/dev/null || true
+  umount -lf "$MOUNT_DIR" 2>/dev/null || true
   build_iso
   info "Done! Copy $OUTPUT_ISO to your Ventoy USB drive."
 }
