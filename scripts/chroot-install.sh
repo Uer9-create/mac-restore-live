@@ -5,6 +5,11 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 export HOME=/root
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig
+
+# Make sure ldconfig picks up /usr/local/lib
+echo '/usr/local/lib' > /etc/ld.so.conf.d/local.conf
+ldconfig
 
 echo "[chroot] Enabling universe repo..."
 apt-get install -y software-properties-common > /dev/null 2>&1 || true
@@ -51,6 +56,8 @@ echo "[chroot] Building libtatsu..."
 git clone --depth=1 https://github.com/libimobiledevice/libtatsu.git
 cd libtatsu && ./autogen.sh --prefix=/usr/local
 make -j$(nproc) && make install && ldconfig
+echo "[chroot] Verifying libtatsu pkg-config..."
+pkg-config --modversion libtatsu-1.0 || { echo "ERROR: libtatsu pkg-config not found!"; pkg-config --list-all | grep tatsu || true; ls /usr/local/lib/pkgconfig/ || true; exit 1; }
 cd /tmp && rm -rf libtatsu
 
 echo "[chroot] Building idevicerestore..."
