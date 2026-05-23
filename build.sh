@@ -21,8 +21,8 @@ error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 
 require_root() { [ "$EUID" -eq 0 ] || error "Please run as root: sudo ./build.sh"; }
 require_tools() {
-  for t in xorriso unsquashfs mksquashfs wget curl python3; do
-    command -v "$t" &>/dev/null || error "Missing tool: $t — run: sudo apt install xorriso squashfs-tools wget curl python3"
+  for t in xorriso unsquashfs mksquashfs wget curl python3 fdisk dd; do
+    command -v "$t" &>/dev/null || error "Missing tool: $t — run: sudo apt install xorriso squashfs-tools wget curl python3 fdisk"
   done
 }
 
@@ -44,6 +44,23 @@ prepare_dirs() {
   umount -lf "$MOUNT_DIR"          2>/dev/null || true
   rm -rf "$WORK_DIR"
   mkdir -p "$MOUNT_DIR" "$EXTRACT_DIR" "$SQUASH_DIR"
+}
+
+extract_boot_images() {
+  info "Extracting MBR and EFI partition from original ISO..."
+  dd if="$UBUNTU_ISO" bs=1 count=432 of="$WORK_DIR/mbr_template.img" 2>/dev/null
+
+  local efi_start efi_size
+  efi_start=$(fdisk -l "$UBUNTU_ISO" 2>/dev/null | awk '/EFI/{print $2}')
+  efi_size=$(fdisk -l  "$UBUNTU_ISO" 2>/dev/null | awk '/EFI/{print $4}')
+
+  if [ -n "$efi_start" ] && [ -n "$efi_size" ]; then
+    dd if="$UBUNTU_ISO" bs=512 skip="$efi_start" count="$efi_size" \
+      of="$WORK_DIR/efi_part.img" 2>/dev/null
+    info "EFI partition extracted ($(du -sh "$WORK_DIR/efi_part.img" | cut -f1))"
+  else
+    warning "Could not locate EFI partition — UEFI boot may not work"
+  fi
 }
 
 mount_iso() {
@@ -106,22 +123,21 @@ rebuild_squashfs() {
 build_iso() {
   info "Building bootable ISO..."
   xorriso -as mkisofs \
+    -r -J --joliet-long \
     -iso-level 3 \
-    -full-iso9660-filenames \
-    -volid "Mac-Restore-Live" \
-    -eltorito-boot boot/grub/bios.img \
-    -no-emul-boot -boot-load-size 4 -boot-info-table \
-    --eltorito-catalog boot/grub/boot.cat \
-    --grub2-boot-info \
-    --grub2-mbr /usr/lib/grub/i386-pc/boot_hybrid.img \
+    -V "Mac-Restore-Live" \
+    --grub2-mbr "$WORK_DIR/mbr_template.img" \
+    -partition_offset 16 \
+    --mbr-force-bootable \
+    -c boot.catalog \
+    -b boot/grub/i386-pc/eltorito.img \
+    -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info \
+    -append_partition 2 0xef "$WORK_DIR/efi_part.img" \
     -eltorito-alt-boot \
-    -e EFI/efi.img \
+    -e "--interval:appended_partition_2:::" \
     -no-emul-boot \
-    -append_partition 2 0xef "$EXTRACT_DIR/EFI/efi.img" \
-    -output "$OUTPUT_ISO" \
-    -graft-points \
-    "$EXTRACT_DIR" \
-    /boot/grub/bios.img="$EXTRACT_DIR/boot/grub/bios.img" 2>&1
+    -o "$OUTPUT_ISO" \
+    "$EXTRACT_DIR" 2>&1
   info "ISO built: $OUTPUT_ISO ($(du -sh "$OUTPUT_ISO" | cut -f1))"
 }
 
@@ -136,6 +152,7 @@ main() {
   require_tools
   download_iso
   prepare_dirs
+  extract_boot_images
   mount_iso
   extract_squashfs
   setup_chroot
