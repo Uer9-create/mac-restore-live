@@ -47,6 +47,12 @@ cd libimobiledevice && ./autogen.sh --prefix=/usr/local --without-cython
 make -j$(nproc) && make install && ldconfig
 cd /tmp && rm -rf libimobiledevice
 
+echo "[chroot] Building libtatsu..."
+git clone --depth=1 https://github.com/libimobiledevice/libtatsu.git
+cd libtatsu && ./autogen.sh --prefix=/usr/local
+make -j$(nproc) && make install && ldconfig
+cd /tmp && rm -rf libtatsu
+
 echo "[chroot] Building idevicerestore..."
 git clone --depth=1 https://github.com/libimobiledevice/idevicerestore.git
 cd idevicerestore && ./autogen.sh --prefix=/usr/local
