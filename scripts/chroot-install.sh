@@ -10,7 +10,7 @@ apt-get update -q
 
 echo "[chroot] Installing runtime dependencies..."
 apt-get install -y \
-  build-essential git autoconf automake libtool pkg-config \
+  build-essential git git-core autoconf automake libtool pkg-config \
   libssl-dev libzip-dev libcurl4-openssl-dev \
   libusb-1.0-0-dev libudev-dev \
   libzstd-dev libreadline-dev \
