@@ -4,6 +4,7 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 export HOME=/root
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 echo "[chroot] Updating package lists..."
 apt-get update -q
@@ -16,7 +17,7 @@ apt-get install -y \
   libzstd-dev libreadline-dev \
   python3 python3-pip python3-requests python3-tqdm \
   wget curl usbutils pciutils \
-  zenity yad 2>&1 | grep -E "^(Get|Setting|Processing|Err)" || true
+  zenity yad
 
 echo "[chroot] Cloning and building libplist..."
 cd /tmp
