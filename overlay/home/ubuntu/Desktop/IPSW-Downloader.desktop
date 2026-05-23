@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Download IPSW
+Comment=Browse and download macOS IPSW restore files
+Exec=bash -c "ipsw-downloader; read -p 'Press Enter to close...'"
+Icon=folder-download
+Terminal=true
+Categories=Network;System;

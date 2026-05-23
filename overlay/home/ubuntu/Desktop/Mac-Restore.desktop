@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Mac Restore
+Comment=Restore macOS using idevicerestore
+Exec=bash -c "sudo mac-restore; read -p 'Press Enter to close...'"
+Icon=system-software-update
+Terminal=true
+Categories=System;

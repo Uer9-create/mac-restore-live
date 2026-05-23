@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""
+IPSW Downloader — queries ipsw.me API to find and download
+macOS/Mac IPSW restore files.
+"""
+import sys, os, json, subprocess, urllib.request, urllib.error
+
+API_BASE = "https://api.ipsw.me/v4"
+DOWNLOAD_DIR = os.path.expanduser("~/Downloads")
+
+def fetch(url):
+    try:
+        with urllib.request.urlopen(url, timeout=15) as r:
+            return json.loads(r.read())
+    except Exception as e:
+        print(f"Error fetching {url}: {e}")
+        sys.exit(1)
+
+def pick(items, label_fn, title):
+    print(f"\n{'='*60}")
+    print(f"  {title}")
+    print(f"{'='*60}")
+    for i, item in enumerate(items):
+        print(f"  [{i+1:>3}] {label_fn(item)}")
+    print(f"{'='*60}")
+    while True:
+        try:
+            choice = int(input(f"Select (1-{len(items)}) or 0 to quit: "))
+            if choice == 0:
+                print("Bye.")
+                sys.exit(0)
+            if 1 <= choice <= len(items):
+                return items[choice - 1]
+        except (ValueError, KeyboardInterrupt):
+            print("\nBye.")
+            sys.exit(0)
+        print("Invalid selection, try again.")
+
+def download(url, filename):
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+    dest = os.path.join(DOWNLOAD_DIR, filename)
+    if os.path.exists(dest):
+        print(f"\nFile already exists: {dest}")
+        if input("Re-download? [y/N]: ").lower() != 'y':
+            return dest
+    print(f"\nDownloading to: {dest}")
+    print("(This may be 10-15 GB — use Ctrl+C to cancel)\n")
+    try:
+        subprocess.run(
+            ["wget", "--progress=bar:force", "-c", "-O", dest, url],
+            check=True
+        )
+    except KeyboardInterrupt:
+        print("\nDownload cancelled.")
+        sys.exit(1)
+    return dest
+
+def main():
+    print("\n╔══════════════════════════════════════╗")
+    print("║       Mac IPSW Downloader            ║")
+    print("║  Powered by ipsw.me API              ║")
+    print("╚══════════════════════════════════════╝")
+
+    print("\nFetching device list from ipsw.me...")
+    devices = fetch(f"{API_BASE}/devices")
+
+    # Filter to Mac/Apple Silicon devices
+    mac_devices = [d for d in devices if any(
+        k in d.get("identifier", "") or k in d.get("name", "")
+        for k in ["Mac", "mac", "iMac", "MacBook", "MacPro", "MacMini", "AppleTV"]
+    )]
+    if not mac_devices:
+        print("No Mac devices found — showing all devices.")
+        mac_devices = devices
+
+    device = pick(
+        sorted(mac_devices, key=lambda d: d.get("name", "")),
+        lambda d: f"{d.get('name','?'):<40} ({d.get('identifier','?')})",
+        "Select your Mac model"
+    )
+
+    print(f"\nFetching firmware list for {device['name']}...")
+    info = fetch(f"{API_BASE}/device/{device['identifier']}?type=ipsw")
+    firmwares = info.get("firmwares", [])
+    if not firmwares:
+        print("No IPSW files found for this device.")
+        sys.exit(1)
+
+    # Sort newest first
+    firmwares.sort(key=lambda f: f.get("releasedate",""), reverse=True)
+
+    fw = pick(
+        firmwares,
+        lambda f: f"{f.get('version','?'):<12} {f.get('buildid','?'):<12} "
+                  f"{'SIGNED' if f.get('signed') else '      '}  {f.get('releasedate','')[:10]}",
+        f"Select firmware for {device['name']}  [version / build / signed / date]"
+    )
+
+    url      = fw.get("url", "")
+    filename = fw.get("filename", url.split("/")[-1])
+    size_mb  = fw.get("filesize", 0) // (1024*1024)
+
+    print(f"\n  Device  : {device['name']}")
+    print(f"  Version : {fw.get('version')} ({fw.get('buildid')})")
+    print(f"  Signed  : {'Yes' if fw.get('signed') else 'No'}")
+    print(f"  Size    : ~{size_mb:,} MB")
+    print(f"  File    : {filename}")
+
+    if input("\nProceed with download? [Y/n]: ").lower() in ("", "y"):
+        dest = download(url, filename)
+        print(f"\n✓ Saved to: {dest}")
+        print(f"\nTo restore your Mac, run:\n  sudo mac-restore '{dest}'\n")
+
+if __name__ == "__main__":
+    main()
